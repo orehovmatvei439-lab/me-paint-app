@@ -1,0 +1,97 @@
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.tabbedpanel import TabbedPanel, TabbedPanelItem
+from kivy.uix.widget import Widget
+from kivy.uix.button import Button
+from kivy.uix.textinput import TextInput
+from kivy.uix.colorpicker import ColorPicker
+from kivy.graphics import Color, Ellipse
+from kivy.core.window import Window
+
+# Стильный тёмный фон для всего приложения
+Window.clearcolor = (0.12, 0.12, 0.12, 1)
+
+class PaintWidget(Widget):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.brush_color = (0, 0, 0, 1)  # Стартовый цвет — чёрный
+
+    def on_touch_down(self, touch):
+        # Рисуем только если кликнули в зоне холста (выше панели кнопок)
+        if self.collide_point(*touch.pos) and touch.y > 100:
+            with self.canvas:
+                Color(*self.brush_color)
+                Ellipse(pos=(touch.x - 6, touch.y - 6), size=(12, 12))
+
+    def on_touch_move(self, touch):
+        if self.collide_point(*touch.pos) and touch.y > 100:
+            with self.canvas:
+                Color(*self.brush_color)
+                Ellipse(pos=(touch.x - 6, touch.y - 6), size=(12, 12))
+
+class SuperApp(App):
+    def build(self):
+        # 1. Создаем панель вкладок
+        tp = TabbedPanel(do_default_tab=False, tab_width=150)
+        
+        # === ВКЛАДКА 1: РИСОВАНИЕ ===
+        tab_draw = TabbedPanelItem(text='🎨 Рисование')
+        draw_layout = BoxLayout(orientation='vertical')
+        
+        self.painter = PaintWidget()
+        draw_layout.add_widget(self.painter)
+        
+        # Нижняя панель управления цветом (как в Ibis)
+        menu_bar = BoxLayout(size_hint_y=None, height=60, spacing=10, padding=5)
+        
+        btn_color = Button(text="🎨 Палитра", background_color=(0.2, 0.6, 0.8, 1))
+        btn_color.bind(on_release=self.open_picker)
+        
+        btn_clear = Button(text="🗑 Очистить", background_color=(0.8, 0.3, 0.3, 1))
+        btn_clear.bind(on_release=lambda x: self.painter.canvas.clear())
+        
+        menu_bar.add_widget(btn_color)
+        menu_bar.add_widget(btn_clear)
+        draw_layout.add_widget(menu_bar)
+        
+        tab_draw.add_widget(draw_layout)
+        tp.add_widget(tab_draw)
+        
+        # === ВКЛАДКА 2: БЛОКНОТ С АВТОСЕЙВОМ ===
+        tab_note = TabbedPanelItem(text='📝 Заметки')
+        note_layout = BoxLayout(orientation='vertical', padding=10)
+        
+        # Поле ввода текста (автоматически сохраняет при каждом изменении букв!)
+        self.txt_input = TextInput(bg_color=(0.18, 0.18, 0.18, 1), foreground_color=(1, 1, 1, 1), font_size=18)
+        self.txt_input.bind(text=self.auto_save)
+        
+        # Попробуем загрузить старый текст, если он есть
+        try:
+            with open("phone_notes.txt", "r", encoding="utf-8") as f:
+                self.txt_input.text = f.read()
+        except:
+            self.txt_input.text = ""
+            
+        note_layout.add_widget(self.txt_input)
+        tab_note.add_widget(note_layout)
+        tp.add_widget(tab_note)
+        
+        return tp
+
+    def open_picker(self, instance):
+        # Открываем крутую палитру-крутилку Ibis Paint
+        self.picker = ColorPicker()
+        self.picker.bind(color=self.on_color_select)
+        self.root.add_widget(self.picker)
+
+    def on_color_select(self, instance, value):
+        self.painter.brush_color = value
+        self.root.remove_widget(self.picker)
+
+    def auto_save(self, instance, value):
+        # Полный автомат: пихает текст в файл при вводе каждой буквы
+        with open("phone_notes.txt", "w", encoding="utf-8") as file:
+            file.write(value)
+
+if __name__ == '__main__':
+    SuperApp().run()
